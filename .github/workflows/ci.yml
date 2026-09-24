@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Syntax check
+        run: python -m compileall -q scripts
+
+      - name: Import smoke test
+        run: |
+          python -c "import sys; sys.path.insert(0, 'scripts'); import config, bspatch; print('imports ok')"
+
+      - name: CLI smoke test (must not require config.json)
+        run: |
+          for s in match_names send_messages napcat_webui apply_qq_update qr_server; do
+            echo "--- $s.py --help"
+            python scripts/$s.py --help > /dev/null
+          done
+
+      - name: bspatch self-test
+        run: python tests/test_bspatch.py
