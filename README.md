@@ -46,6 +46,8 @@
 - NapCat 对 QQ NT 版本是**精确白名单**（构建号差一位都不行），部署前先确认你的 NapCat 版本支持哪个 QQ 版本
 
 ```bash
+git clone https://github.com/hhhsmallwhite/napcat-group-notify.git
+cd napcat-group-notify
 pip install numpy Pillow
 cp config.example.json config.json   # 按注释填写：群号、测试QQ、消息文本、NapCat 目录
 ```
