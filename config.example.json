@@ -1,0 +1,31 @@
+{
+  "_说明": "复制本文件为 config.json 后按需填写。带 * 为必填。",
+
+  "napcat_shell": "D:/NapCat/shell",
+  "_napcat_shell": "* NapCat Shell 版所在目录（其下应有 config/webui.json 与 napcat.mjs）",
+
+  "ob11_http": "http://127.0.0.1:3000",
+  "_ob11_http": "* OneBot 11 HTTP 服务地址（由 napcat_webui.py enable-http 开启）",
+
+  "group_id": 123456789,
+  "_group_id": "* 目标群号。不确定时先跑 match_names.py --list-groups 查看账号所在群",
+
+  "test_user_id": 10001,
+  "_test_user_id": "* 通路测试接收人：一个你自己能收到消息的 QQ 号（比如你的主号），需在目标群里",
+
+  "message": "这里是通知内容，纯文字。请勿包含链接/图片/文件，群临时会话发媒体必失败且易触发风控",
+  "_message": "* 要逐个发送的文本",
+
+  "names_file": "names.txt",
+  "_names_file": "名单文件：一行一个姓名，与群名片做精确匹配",
+
+  "alias": [],
+  "_alias": "同名不同字的人工确认表，如 [{\"name\": \"名单上的写法\", \"user_id\": 123456}]。由 match_names.py 的输出经你人工确认后填入",
+
+  "min_gap_sec": 20,
+  "max_gap_sec": 40,
+  "_gap": "发送间隔随机区间（秒）。别调小：固定/过短间隔是机器人典型特征",
+
+  "max_consecutive_fail": 3,
+  "_max_consecutive_fail": "连续失败多少条后熔断停止"
+}
