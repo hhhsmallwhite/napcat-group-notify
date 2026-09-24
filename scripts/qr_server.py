@@ -7,7 +7,9 @@ QQ 登录二维码有效期只有两三分钟，而且 NapCat 刷新几次后就
   * 检测到二维码快过期就自动刷新，不会出现「扫了才发现已过期」
 
 用法:
-    python qr_server.py --shell D:/NapCat/shell     # 默认 127.0.0.1:8899
+    python qr_server.py                            # 端口/目录都读 config.json
+    python qr_server.py --shell D:/NapCat/shell    # 显式指定 NapCat 目录
+    python qr_server.py 9000                       # 换端口
     python qr_server.py --shell D:/NapCat/shell 9000
 
 依赖: pip install Pillow
@@ -28,6 +30,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from PIL import Image
+
+sys.path.insert(0, str(Path(__file__).parent))
+from config import load_config  # noqa: E402
 
 SCALE = 8
 MARGIN = 60
@@ -232,13 +237,21 @@ def build_handler(bot: NapCat):
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--shell", required=True, help="NapCat Shell 目录")
+    ap.add_argument("--shell", help="NapCat Shell 目录（默认读 config.json 的 napcat_shell）")
     ap.add_argument("port", nargs="?", type=int, default=8899)
     args = ap.parse_args()
 
-    bot = NapCat(Path(args.shell))
+    shell = args.shell
+    if not shell:
+        try:
+            shell = load_config()["napcat_shell"]
+        except SystemExit:
+            ap.error("未指定 --shell，且 config.json 不可用（请先复制 config.example.json）")
+
+    bot = NapCat(Path(shell))
     srv = ThreadingHTTPServer(("127.0.0.1", args.port), build_handler(bot))
     print(f"[i] 面板地址: http://127.0.0.1:{args.port}")
+    print(f"[i] NapCat   : {shell}")
     print(f"[i] 二维码源: {bot.qr_src}")
     print(f"[i] 超过 {AUTO_REFRESH_AFTER} 秒自动刷新二维码")
     try:

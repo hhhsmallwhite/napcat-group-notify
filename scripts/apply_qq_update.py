@@ -11,12 +11,17 @@ QQ 自身的 `versions/<旧版>-<新版>.zip` 热更新包入手——QQ 经常�
   raw_files/...      # 新增文件的完整内容（部分 modified 文件也直接给整份）
   <路径/.→_>.patch   # modified 文件的 BSDIFF40 补丁，文件名=原路径 / 换 _ 加 .patch
 
+注意路径语义：diff.json 里的 key 是**相对版本目录**的路径（如
+`resources/app/QBar.dll`），源文件实际位于 `<QQ目录>/versions/<版本号>/...`。
+本脚本会自动探测 versions/ 下的版本目录；也可用 --old-version 显式指定。
+
 安全原则：全程只操作副本，源 QQ 目录只读。每个产物都与 diff.json 的 size/md5
 比对，任何一项对不上立即报错停止。
 
 用法:
     python apply_qq_update.py --zip QQ热更新包.zip --src 当前QQ目录 --dst 目标副本目录
-    python apply_qq_update.py --zip ... --src ... --dst ... --test   # 只验证补丁格式
+    python apply_qq_update.py --zip ... --src ... --dst ... --test
+    python apply_qq_update.py --zip ... --src ... --dst ... --old-version 9.9.33-51802
 
 依赖: pip install numpy
 """
@@ -48,7 +53,43 @@ def patch_name(path: str) -> str:
     return path.replace("/", "_") + ".patch"
 
 
-def apply_one(zf: zipfile.ZipFile, diff: dict, path: str, src: Path, dst: Path) -> str:
+def resolve_old_file(src: Path, path: str, old_version: str | None = None) -> Path:
+    """定位源文件。
+
+    diff.json 的 key 相对**版本目录**，所以优先在 src/versions/<版本号>/ 下找；
+    版本号未指定时自动探测 versions/ 下的目录，再兜底 src 直下。
+    """
+    tried: list[Path] = []
+
+    versions_dir = src / "versions"
+    if old_version:
+        candidates = [versions_dir / old_version]
+    elif versions_dir.is_dir():
+        # 只取目录（versions/ 下同时躺着 .zip 热更新包和 config.json）
+        candidates = sorted(d for d in versions_dir.iterdir() if d.is_dir())
+    else:
+        candidates = []
+
+    for d in candidates:
+        f = d / path
+        if f.exists():
+            return f
+        tried.append(f)
+
+    fallback = src / path
+    if fallback.exists():
+        return fallback
+
+    raise FileNotFoundError(
+        f"找不到源文件 {path}\n"
+        f"  已尝试: {[str(p) for p in tried] or '（无版本目录）'}\n"
+        f"  兜底:   {fallback}\n"
+        f"  提示: 用 --old-version 显式指定版本目录名"
+    )
+
+
+def apply_one(zf: zipfile.ZipFile, diff: dict, path: str,
+              src: Path, dst: Path, old_version: str | None) -> str:
     """处理单个 modified 文件，返回 'bsdiff' / 'raw'。"""
     info = diff["modified"][path]
     dst_file = dst / path
@@ -56,11 +97,7 @@ def apply_one(zf: zipfile.ZipFile, diff: dict, path: str, src: Path, dst: Path) 
 
     cand = patch_name(path)
     if cand in zf.namelist():
-        old_file = src / "versions" / path
-        if not old_file.exists():
-            # 有的版本目录结构与 src 布局不同，尝试 src 直下
-            old_file = src / path
-        old = old_file.read_bytes()
+        old = resolve_old_file(src, path, old_version).read_bytes()
         new = bspatch(old, zf.read(cand))
         mode = "bsdiff"
     elif ("raw_files/" + path) in zf.namelist():
@@ -76,15 +113,28 @@ def apply_one(zf: zipfile.ZipFile, diff: dict, path: str, src: Path, dst: Path) 
     return mode
 
 
-def cmd_test(zf: zipfile.ZipFile, diff: dict, src: Path) -> int:
-    """取 modified 里最小的一个文件验证 bspatch 实现正确性。"""
-    target = min(diff["modified"], key=lambda k: diff["modified"][k]["size"])
+def cmd_test(zf: zipfile.ZipFile, diff: dict, src: Path,
+             old_version: str | None) -> int:
+    """取最小的一个「带 .patch 的」文件验证 bspatch 实现正确性。
+
+    注意：modified 里有一部分文件是整份替换（只有 raw_files/、没有 .patch），
+    必须先过滤，否则会 KeyError。
+    """
+    patched = [k for k in diff["modified"] if patch_name(k) in zf.namelist()]
+    raw_only = len(diff["modified"]) - len(patched)
+    print(f"modified 共 {len(diff['modified'])} 项："
+          f"{len(patched)} 项走 bsdiff 补丁，{raw_only} 项整份替换\n")
+
+    if not patched:
+        print("补丁包里没有任何 .patch 文件，跳过 bspatch 验证。")
+        return 0
+
+    target = min(patched, key=lambda k: diff["modified"][k]["size"])
     info = diff["modified"][target]
     print(f"验证目标: {target} (期望 {info['size']:,} bytes)")
 
-    old_file = src / "versions" / target
-    if not old_file.exists():
-        old_file = src / target
+    old_file = resolve_old_file(src, target, old_version)
+    print(f"源文件  : {old_file}")
     new = bspatch(old_file.read_bytes(), zf.read(patch_name(target)))
 
     ok = len(new) == info["size"] and md5_of(new) == info["md5"]
@@ -93,7 +143,8 @@ def cmd_test(zf: zipfile.ZipFile, diff: dict, src: Path) -> int:
     return 0 if ok else 1
 
 
-def cmd_apply(zf: zipfile.ZipFile, diff: dict, src: Path, dst: Path) -> int:
+def cmd_apply(zf: zipfile.ZipFile, diff: dict, src: Path, dst: Path,
+              old_version: str | None) -> int:
     if dst.exists():
         raise SystemExit(f"[!] 目标已存在，拒绝覆盖: {dst}\n    删除后重试，或换一个目录。")
     print(f"[i] 复制 {src} -> {dst} （2~3 GB，耐心等）")
@@ -117,7 +168,7 @@ def cmd_apply(zf: zipfile.ZipFile, diff: dict, src: Path, dst: Path) -> int:
             print(f"  [{i}/{total}] added {path}")
 
     for i, path in enumerate(diff.get("modified", {}), 1):
-        mode = apply_one(zf, diff, path, src, dst)
+        mode = apply_one(zf, diff, path, src, dst, old_version)
         stats[mode] += 1
         if i % 5 == 0 or i == total:
             print(f"  [{i}/{total}] {mode} {path}")
@@ -139,6 +190,7 @@ def main() -> int:
     ap.add_argument("--zip", required=True, help="热更新包路径（versions/旧版-新版.zip）")
     ap.add_argument("--src", required=True, help="当前 QQ 安装目录（只读，不会被改）")
     ap.add_argument("--dst", required=True, help="目标副本目录（会自动创建）")
+    ap.add_argument("--old-version", help="源版本目录名（如 9.9.33-51802），默认自动探测")
     ap.add_argument("--test", action="store_true", help="只验证补丁格式，不落盘")
     args = ap.parse_args()
 
@@ -153,8 +205,8 @@ def main() -> int:
           f"deleted={len(diff.get('deleted', {}))}\n")
 
     if args.test:
-        return cmd_test(zf, diff, src)
-    return cmd_apply(zf, diff, src, dst)
+        return cmd_test(zf, diff, src, args.old_version)
+    return cmd_apply(zf, diff, src, dst, args.old_version)
 
 
 if __name__ == "__main__":

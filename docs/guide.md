@@ -142,3 +142,27 @@ python scripts/send_messages.py --go     # 正式发送
 | Python 3.13 装不上 bsdiff4 | 无官方 wheel，用本仓库的纯 Python 实现（`bspatch.py`） |
 | Pillow/opencv 装不上 | 国内镜像可能缺 3.13 轮子，走官方 PyPI 源 |
 | 群成员列表看不到刚改的群名片 | `get_group_member_list` 加 `no_cache: true` |
+
+## 8. 故障排查
+
+按「现象 → 原因 → 处理」查表：
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `PacketBackend 不支持当前QQ版本架构` | QQ 版本不在 NapCat 白名单（无回退） | 见第 2 节版本对齐 |
+| 启动器报 `provided QQ path is invalid` | 官方启动器读注册表，便携版无记录 | 用自写启动器写死路径 |
+| 二维码扫不出来 | 原图仅 147×147，模块太密 | 用 `qr_server.py` 面板（放大 8 倍 + 补白边） |
+| 扫码后一直不动 / 提示已过期 | 手机上没点「确认登录」 | 查 `CheckLoginStatus` 的 `loginPhase`（`qrcode_scanned` 即是此情况） |
+| 二维码文件长时间不更新 | NapCat 刷新几次后放弃刷新 | 面板会自动调 `RefreshQRcode`；手动触发同接口 |
+| 报「当前账号已登录，无法重复登录」 | 同一账号已在 QQ 客户端登录（同端互斥） | 重试通常可过；或退出客户端的同号 |
+| `config is empty` | `SetConfig` payload 结构不对 | 必须是 `{"config": "<JSON字符串>"}` |
+| `404 Cannot GET /api/...` | 用了 GET 请求 | WebUI API 一律 POST |
+| 私聊报错「不是好友」类 | 用了 `send_private_msg` | 改 `send_msg` + `message_type=private` + `group_id` |
+| 发送报错但原因不明 | 对方关闭了临时会话，或群主关闭了群内临时会话开关 | 逐条记录跳过；无法预判，只能发时才知道 |
+| 群名片刚改却读不到 | 成员列表缓存 | `no_cache: true` 重拉 |
+| 发送中途连续失败 | 风控或对方设置 | 脚本已自动熔断；人工核查后再决定是否重发 |
+| 少量消息发不出去 | 对方拒绝陌生人消息 | 属正常，记录后跳过 |
+
+**排查心法**：登录类问题永远先看 `CheckLoginStatus` 的 `loginPhase` 和 `loginError`，
+不要凭「二维码过期」这类表象下结论——最常见的「过期」其实是「没点确认」。
+

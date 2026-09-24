@@ -1,0 +1,13 @@
+# 统一行尾，避免 Windows 上开发、Linux 上运行时的 CRLF 警告
+* text=auto eol=lf
+
+*.py   text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+*.txt  text eol=lf
+*.sh   text eol=lf
+
+# 二进制
+*.png binary
+*.jpg binary
+*.zip binary

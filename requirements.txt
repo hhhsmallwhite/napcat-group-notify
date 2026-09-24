@@ -1,0 +1,4 @@
+# 运行脚本所需依赖
+# 安装: pip install -r requirements.txt
+numpy>=1.24      # bspatch 的字节运算向量化（apply_qq_update.py）
+Pillow>=10.0     # 二维码放大与渲染（qr_server.py）

@@ -2,7 +2,9 @@
 
 基于 [NapCat](https://github.com/NapNeko/NapCatQQ)（OneBot 11 协议端）的 **QQ 群成员定向私聊通知工具**：给名单上的群成员逐个发送私聊提醒，支持按姓名自动匹配群名片、随机间隔防风控、失败熔断、通路测试。
 
-> 已在真实环境完整跑通：按 109 人名单匹配班级群成员，23 条群临时会话全部发送成功、零失败。
+> **EN** | Send **individual private messages to QQ group members matched by real name**, built on NapCat (OneBot 11). Features: group-card name matching, randomized send intervals, fail-fast circuit breaker, QR login panel with auto-refresh. For class monitors, teachers and community managers who need to reach specific members without spamming the whole group.
+
+> 已在真实班级场景跑通：按名单匹配群成员并批量发送群临时会话，零失败、未触发风控。
 
 ## 适用场景
 
@@ -48,8 +50,9 @@
 ```bash
 git clone https://github.com/hhhsmallwhite/napcat-group-notify.git
 cd napcat-group-notify
-pip install numpy Pillow
+pip install -r requirements.txt
 cp config.example.json config.json   # 按注释填写：群号、测试QQ、消息文本、NapCat 目录
+cp names.example.txt names.txt       # 名单：一行一个姓名（与群名片做精确匹配）
 ```
 
 ### 1. 开启 OneBot HTTP（登录后执行一次）
@@ -109,6 +112,34 @@ python scripts/send_messages.py --go     # 正式发送（随机间隔，失败�
 | `OB11Config/SetConfig` 报 config is empty | payload 必须是 `{"config": "<JSON字符串>"}`（先序列化再包一层） |
 | 扫码后卡住不动 | 手机上没点「确认登录」，用 `CheckLoginStatus` 看 `loginPhase` |
 | 重启后要重新扫码 | 新登录账号凭据未必持久化，属预期行为 |
+
+## 限制与前提
+
+- **只能纯文字**：群临时会话发图片/文件必失败（NapCat 已知限制），消息里也别放链接
+- **对方可以拒绝**：群主可关闭「允许群成员发起临时会话」，成员也可拒绝陌生人消息——这类失败无法预判，脚本会逐条记录
+- **通知用 QQ 号必须已在目标群内**，否则读不到群名片、匹配无从谈起
+- **NapCat 与 QQ 版本强绑定**：QQ 更新后可能要等 NapCat 适配，**不要随意升级任何一方**（见 docs/guide.md）
+- **不适合高频大批量**：单次建议 ≤ 30 条。这是给「几十人的班级/小组」设计的，不是营销群发工具
+
+## FAQ
+
+**Q：为什么不用 QQ 官方机器人？**
+官方机器人拿不到群成员列表；用户标识是每个 bot 独占的 openid，只能回复主动交互过的用户；主动私聊还有硬配额（错误码 304049/304050）。要按名单触达群成员，只能走协议端。
+
+**Q：为什么不用群公告或群发助手？**
+群公告无法保证触达、也无法只提醒「未完成的人」；QQ 没有面向群成员的批量私聊功能，手工逐个发既慢又容易漏。
+
+**Q：同学收到的是什么样？**
+每人收到一条独立私聊，来自你的账号，其他人看不到，群里也不会有记录。
+
+**Q：会不会被封号？**
+有风险，见「风险与免责」。降低风险：纯文字 + 随机间隔 20~40 秒 + 单次 ≤30 条 + 失败立即停。
+
+**Q：名单里有人群里找不到怎么办？**
+`match_names.py` 会分三档输出：命中 / 未命中（含疑似 OCR 错字提示）/ 群内多出。让成员把群名片改成真名，或从发送范围排除。
+
+**Q：支持 Linux / macOS 吗？**
+脚本是跨平台 Python；NapCat 部署方式见其官方文档。本项目在 Windows 上实测。
 
 ## 风险与免责（务必阅读）
 
