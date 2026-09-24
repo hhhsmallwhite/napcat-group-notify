@@ -1,5 +1,9 @@
 # napcat-group-notify
 
+[![CI](https://github.com/hhhsmallwhite/napcat-group-notify/actions/workflows/ci.yml/badge.svg)](https://github.com/hhhsmallwhite/napcat-group-notify/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+
 基于 [NapCat](https://github.com/NapNeko/NapCatQQ)（OneBot 11 协议端）的 **QQ 群成员定向私聊通知工具**：给名单上的群成员逐个发送私聊提醒，支持按姓名自动匹配群名片、随机间隔防风控、失败熔断、通路测试。
 
 > **EN** | Send **individual private messages to QQ group members matched by real name**, built on NapCat (OneBot 11). Features: group-card name matching, randomized send intervals, fail-fast circuit breaker, QR login panel with auto-refresh. For class monitors, teachers and community managers who need to reach specific members without spamming the whole group.
