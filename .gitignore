@@ -1,0 +1,11 @@
+# 本地私有配置：含真实群号 / QQ 号 / 消息文本，绝不提交
+config.json
+names.txt
+
+# 运行产物：含真实姓名与 QQ 号对应关系，绝不提交
+send_result.json
+match_result.json
+
+# Python
+__pycache__/
+*.pyc
